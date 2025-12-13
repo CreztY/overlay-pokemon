@@ -8,16 +8,20 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = ['https://pokeoverlay.crezty.com'];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // En producción, restringir a la URL del frontend
+    origin: allowedOrigins,
     methods: ["GET", "POST"]
   }
 });
 
 const PORT = 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins
+}));
 app.use(express.json());
 
 // --- Rate Limiters ---
