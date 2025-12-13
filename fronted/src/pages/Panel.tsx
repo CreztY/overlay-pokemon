@@ -69,51 +69,54 @@ function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, p
       style={style}
       {...attributes}
       {...listeners}
-      className={`bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-shadow min-h-[250px] relative ${pokemon?.isDead ? 'bg-gray-100' : ''} ${isDragging ? 'opacity-50 ring-2 ring-blue-500' : ''}`}
-    >
-      <div className="text-gray-400 font-semibold mb-2 w-full flex justify-between items-center">
-        <span>Slot {slot}</span>
-        {pokemon && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleDead(!!pokemon.isDead);
-            }}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-bold cursor-pointer transition-colors ${pokemon.isDead ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'}`}
-            title={pokemon.isDead ? "Revivir" : "Debilitar"}
-          >
-            {pokemon.isDead ? <Heart size={14} /> : <Skull size={14} />}
-            {pokemon.isDead ? "REVIVIR" : "DEBILITAR"}
-          </button>
-        )}
-      </div>
-      {pokemon ? (
-        <div className="flex flex-col items-center">
-          <img
-            src={pokemon.spriteUrl}
-            alt={pokemon.name}
-            className={`w-32 h-32 object-contain mb-4 drop-shadow-md ${pokemon.isDead ? 'grayscale opacity-60' : ''}`}
-          />
-          <p className={'text-xl font-bold capitalize text-gray-800'}>{pokemon.name}</p>
-          {pokemon.name.toLowerCase() !== pokemon.species.toLowerCase() && (
-            <p className="text-sm text-gray-500 capitalize">({pokemon.species})</p>
-          )}
-          {!!pokemon.isDead && <span className="mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-full">DEBILITADO</span>}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
-          <Plus size={48} className="mb-2 opacity-20" />
-          <p>Vacío</p>
-        </div>
-      )}
-      <button
-        onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
-        onClick={onEdit}
-        className="mt-6 w-full py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors font-medium cursor-pointer flex items-center justify-center gap-2"
+      className='relative'>
+      <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500 cursor-grab" />
+      <div
+        className={`bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-shadow min-h-[250px] relative cursor-grab ${pokemon?.isDead ? 'bg-gray-100' : ''} ${isDragging ? 'opacity-50 ring-2 ring-blue-500' : ''}`}
       >
-        {pokemon ? <><Edit2 size={16} /> Editar</> : <><Plus size={16} /> Añadir Pokémon</>}
-      </button>
+        <div className="text-gray-400 font-semibold mb-2 w-full flex justify-between items-center">
+          <span>Slot {slot}</span>
+          {pokemon && (
+            <button
+              onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleDead(!!pokemon.isDead);
+              }}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-bold cursor-pointer transition-colors ${pokemon.isDead ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'}`}
+              title={pokemon.isDead ? "Revivir" : "Debilitar"}
+            >
+              {pokemon.isDead ? <Heart size={14} /> : <Skull size={14} />}
+              {pokemon.isDead ? "REVIVIR" : "DEBILITAR"}
+            </button>
+          )}
+        </div>
+        {pokemon ? (
+          <div className="flex flex-col items-center">
+            <img
+              src={pokemon.spriteUrl}
+              alt={pokemon.name}
+              className={`w-32 h-32 object-contain mb-4 drop-shadow-md ${pokemon.isDead ? 'grayscale opacity-60' : ''}`}
+            />
+            <p className={'text-xl font-bold capitalize text-gray-800'}>{pokemon.name}</p>
+            {pokemon.name.toLowerCase() !== pokemon.species.toLowerCase() && (
+              <p className="text-sm text-gray-500 capitalize">({pokemon.species})</p>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
+            <Plus size={48} className="mb-2 opacity-20" />
+            <p>Vacío</p>
+          </div>
+        )}
+        <button
+          onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
+          onClick={onEdit}
+          className="mt-6 w-full py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors font-medium cursor-pointer flex items-center justify-center gap-2"
+        >
+          {pokemon ? <><Edit2 size={16} /> Editar</> : <><Plus size={16} /> Añadir Pokémon</>}
+        </button>
+      </div>
     </div>
   )
 }
@@ -330,21 +333,10 @@ function Panel() {
       const oldIndex = (active.id as number) - 1
       const newIndex = (over?.id as number) - 1
 
-      // Create a new array of slots 1-6
       const slots = [1, 2, 3, 4, 5, 6]
       const newSlots = arrayMove(slots, oldIndex, newIndex)
 
-      // Map current team to new slots
-      // We need to construct the new state to send to backend
-      // The 'team' array contains pokemon with 'slot' property.
-      // We need to update their 'slot' property based on the new order.
-
       const updates: { id: number, slot: number }[] = []
-
-      // Iterate through the new slot order
-      // newSlots[0] is the slot number that is now at position 0 (Slot 1)
-      // So if newSlots[0] was 2, it means Slot 2 moved to Position 1.
-      // The pokemon that WAS in Slot 2 should now be in Slot 1.
 
       newSlots.forEach((originalSlotNum, index) => {
         const newSlotNum = index + 1
@@ -423,14 +415,14 @@ function Panel() {
           <div className="flex gap-4">
             <button
               onClick={toggleOrientation}
-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium flex items-center gap-2 cursor-pointer"
             >
               {orientation === 'horizontal' ? <ArrowLeftRight size={18} /> : <ArrowUpDown size={18} />}
               <span>{orientation === 'horizontal' ? 'Horizontal' : 'Vertical'}</span>
             </button>
             <button
               onClick={() => setUserKey(null)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-medium flex items-center gap-2"
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-medium flex items-center gap-2 cursor-pointer"
             >
               <LogOut size={18} />
               Salir
@@ -443,7 +435,7 @@ function Panel() {
             <h2 className="text-lg font-bold text-gray-800">Información de Conexión</h2>
             <button
               onClick={() => setShowApiKey(!showApiKey)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${showApiKey
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 cursor-pointer ${showApiKey
                 ? 'bg-red-50 text-red-600 hover:bg-red-100'
                 : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                 }`}
@@ -508,7 +500,7 @@ function Panel() {
             items={[1, 2, 3, 4, 5, 6]}
             strategy={rectSortingStrategy}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
               {[1, 2, 3, 4, 5, 6].map((slot) => {
                 const pokemon = team.find((p) => p.slot === slot)
                 return (
