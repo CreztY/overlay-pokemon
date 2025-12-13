@@ -10,13 +10,25 @@ import {
   Key,
   Calendar,
   Database,
-  ShieldAlert
+  ShieldAlert,
+  X,
+  Skull,
+  Heart
 } from 'lucide-react'
 
 interface User {
   apiKey: string
   createdAt: string
   pokemonCount: number
+}
+
+interface Pokemon {
+  id: number
+  slot: number
+  name: string
+  species: string
+  spriteUrl: string
+  isDead: boolean
 }
 
 function Admin() {
@@ -26,6 +38,11 @@ function Admin() {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Modal State
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [userPokemon, setUserPokemon] = useState<Pokemon[]>([])
+  const [isLoadingPokemon, setIsLoadingPokemon] = useState(false)
 
   const fetchKeys = useCallback(async () => {
     try {
@@ -85,6 +102,9 @@ function Admin() {
     try {
       await axios.delete(`http://localhost:3000/api/admin/keys/${key}`)
       fetchKeys()
+      if (selectedUser?.apiKey === key) {
+        setSelectedUser(null)
+      }
     } catch (err) {
       console.error(err)
     }
@@ -93,6 +113,20 @@ function Admin() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     // Could add a toast notification here
+  }
+
+  const handleUserClick = async (user: User) => {
+    setSelectedUser(user)
+    setIsLoadingPokemon(true)
+    try {
+      const res = await axios.get(`http://localhost:3000/api/pokemon/${user.apiKey}`)
+      setUserPokemon(res.data)
+    } catch (err) {
+      console.error(err)
+      setUserPokemon([])
+    } finally {
+      setIsLoadingPokemon(false)
+    }
   }
 
   if (!isAdmin) {
@@ -237,14 +271,21 @@ function Admin() {
                   </tr>
                 ) : (
                   filteredUsers.map((user) => (
-                    <tr key={user.apiKey} className="hover:bg-gray-50 transition-colors group">
+                    <tr
+                      key={user.apiKey}
+                      className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                      onClick={() => handleUserClick(user)}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <code className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border border-gray-200">
                             {user.apiKey}
                           </code>
                           <button
-                            onClick={() => copyToClipboard(user.apiKey)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              copyToClipboard(user.apiKey)
+                            }}
                             className="text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Copiar Key"
                           >
@@ -263,7 +304,10 @@ function Admin() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button
-                          onClick={() => deleteKey(user.apiKey)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deleteKey(user.apiKey)
+                          }}
                           className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-md transition-colors"
                           title="Revocar acceso"
                         >
@@ -282,6 +326,99 @@ function Admin() {
           </div>
         </div>
       </div>
+
+      {/* User Details Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-zoom-in">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Detalles del Usuario</h2>
+                <p className="text-sm text-gray-500 font-mono mt-1">{selectedUser.apiKey}</p>
+              </div>
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="mb-6 flex gap-4 text-sm">
+                <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">
+                  Creado: {new Date(selectedUser.createdAt).toLocaleString()}
+                </div>
+                <div className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full border border-purple-100">
+                  Pokémon: {userPokemon.length} / 6
+                </div>
+              </div>
+
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Database size={20} className="text-gray-400" />
+                Equipo Pokémon
+              </h3>
+
+              {isLoadingPokemon ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : userPokemon.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <p className="text-gray-500">Este usuario no tiene Pokémon registrados.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {userPokemon.map((pokemon) => (
+                    <div
+                      key={pokemon.id}
+                      className={`relative p-3 rounded-lg border ${pokemon.isDead ? 'bg-gray-100 border-gray-200' : 'bg-white border-blue-100 shadow-sm'}`}
+                    >
+                      <div className="absolute top-2 right-2">
+                        {pokemon.isDead ? (
+                          <Skull size={16} className="text-gray-400" />
+                        ) : (
+                          <Heart size={16} className="text-red-400 fill-red-400" />
+                        )}
+                      </div>
+                      <div className="aspect-square flex items-center justify-center mb-2">
+                        <img
+                          src={pokemon.spriteUrl}
+                          alt={pokemon.name}
+                          className={`w-full h-full object-contain ${pokemon.isDead ? 'grayscale opacity-50' : ''}`}
+                        />
+                      </div>
+                      <p className="text-center font-bold text-sm capitalize truncate" title={pokemon.name}>
+                        {pokemon.name}
+                      </p>
+                      <p className="text-center text-xs text-gray-500">Slot {pokemon.slot}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition-colors font-medium"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => deleteKey(selectedUser.apiKey)}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
+              >
+                <Trash2 size={18} />
+                Eliminar Usuario
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
