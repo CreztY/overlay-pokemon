@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const httpServer = createServer(app);
-const allowedOrigins = ['https://pokeoverlay.crezty.com'];
+const allowedOrigins = ['https://pokeoverlay.crezty.com', 'https://pokemon-overlay-rust.vercel.app/'];
 
 const io = new Server(httpServer, {
   cors: {
@@ -26,7 +26,7 @@ app.use(express.json());
 
 // --- Rate Limiters ---
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
+  windowMs: 15 * 60 * 1000,
   max: 5, // Limita a 5 intentos por IP
   message: { success: false, message: 'Demasiados intentos de inicio de sesión, por favor intente de nuevo en 15 minutos' },
   standardHeaders: true,

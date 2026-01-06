@@ -4,12 +4,16 @@ import axios from 'axios'
 import { io } from 'socket.io-client'
 import {
   DndContext,
-  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent
+  type DragEndEvent,
+  useDroppable,
+  DragOverlay,
+  type DragStartEvent,
+  type DragOverEvent,
+  rectIntersection
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -34,7 +38,8 @@ import {
   Skull,
   Heart,
   Search,
-  Key
+  Key,
+  Box as BoxIcon
 } from 'lucide-react'
 
 interface Pokemon {
@@ -46,8 +51,15 @@ interface Pokemon {
   isDead: boolean
 }
 
-// Componente para cada Slot Sortable
-function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, pokemon?: Pokemon, onEdit: () => void, onToggleDead: (status: boolean) => void }) {
+interface PokeApiPokemon {
+  name: string;
+  sprites: {
+    front_default: string;
+  };
+}
+
+// Componente para cada Slot Sortable del Equipo
+function SortableSlot({ id, slot, pokemon, onEdit, onToggleDead }: { id: string, slot: number, pokemon?: Pokemon, onEdit: () => void, onToggleDead: (status: boolean) => void }) {
   const {
     attributes,
     listeners,
@@ -55,7 +67,7 @@ function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, p
     transform,
     transition,
     isDragging
-  } = useSortable({ id: slot })
+  } = useSortable({ id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -70,9 +82,9 @@ function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, p
       {...attributes}
       {...listeners}
       className='relative'>
-      <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500 cursor-grab" />
+      <div className={`absolute -inset-4 bg-linear-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500'}`} />
       <div
-        className={`bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-shadow min-h-[250px] relative cursor-grab ${pokemon?.isDead ? 'bg-gray-100' : ''} ${isDragging ? 'opacity-50 ring-2 ring-blue-500' : ''}`}
+        className={`bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-shadow min-h-[250px] relative cursor-grab ${pokemon?.isDead ? 'bg-gray-100' : ''} ${isDragging ? 'opacity-30 ring-2 ring-blue-500' : ''}`}
       >
         <div className="text-gray-400 font-semibold mb-2 w-full flex justify-between items-center">
           <span>Slot {slot}</span>
@@ -92,7 +104,7 @@ function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, p
           )}
         </div>
         {pokemon ? (
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center pointer-events-none">
             <img
               src={pokemon.spriteUrl}
               alt={pokemon.name}
@@ -104,7 +116,7 @@ function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, p
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center flex-grow text-gray-400">
+          <div className="flex flex-col items-center justify-center grow text-gray-400 pointer-events-none">
             <Plus size={48} className="mb-2 opacity-20" />
             <p>Vacío</p>
           </div>
@@ -121,6 +133,63 @@ function SortableSlot({ slot, pokemon, onEdit, onToggleDead }: { slot: number, p
   )
 }
 
+// Componente para los Pokémon en la Caja
+function SortableBoxItem({ id, pokemon }: { id: string, pokemon: Pokemon }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`relative bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow cursor-grab flex flex-col items-center w-24 h-32 justify-center ${isDragging ? 'opacity-50 ring-2 ring-indigo-400' : ''}`}
+    >
+      <img
+        src={pokemon.spriteUrl}
+        alt={pokemon.name}
+        className="w-16 h-16 object-contain mb-1 pointer-events-none"
+      />
+      <p className="text-xs font-bold text-gray-700 text-center truncate w-full pointer-events-none">{pokemon.name}</p>
+      {pokemon.isDead ? <Skull size={12} className="text-gray-400 absolute top-1 right-1" /> : null}
+    </div>
+  )
+}
+
+// Contenedor de la caja droppable
+function DropBox({ children, className }: { children: React.ReactNode, className?: string }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'box-container',
+  })
+
+  return (
+    <div ref={setNodeRef} className={`relative transition-all duration-300 ${isOver ? 'bg-blue-100 border-blue-400 scale-[1.01] shadow-md ring-4 ring-blue-200' : ''} ${className}`}>
+      {children}
+      {isOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-blue-50/50 backdrop-blur-[1px] rounded-lg z-10 pointer-events-none">
+          <div className="bg-white p-4 rounded-full shadow-lg text-blue-500 animate-bounce">
+            <BoxIcon size={40} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 function Panel() {
   const { userKey, setUserKey } = useAuth()
   const [inputKey, setInputKey] = useState('')
@@ -128,18 +197,25 @@ function Panel() {
   const [isCreatingKey, setIsCreatingKey] = useState(false)
 
   const [team, setTeam] = useState<Pokemon[]>([])
+  const [box, setBox] = useState<Pokemon[]>([])
   const [editingSlot, setEditingSlot] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [selectedPokemon, setSelectedPokemon] = useState<any>(null)
+
+  const [selectedPokemon, setSelectedPokemon] = useState<PokeApiPokemon | null>(null)
   const [nickname, setNickname] = useState('')
   const [isDead, setIsDead] = useState(false)
   const [customSpriteUrl, setCustomSpriteUrl] = useState('')
   const [orientation, setOrientation] = useState<'horizontal' | 'vertical'>('horizontal')
   const [showApiKey, setShowApiKey] = useState(false)
 
+  const [activeId, setActiveId] = useState<string | null>(null)
+
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -148,10 +224,10 @@ function Panel() {
   const fetchTeam = async () => {
     if (!userKey) return
     try {
-      const res = await axios.get(`http://localhost:3000/api/pokemon/${userKey}`)
+      const res = await axios.get(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`)
       setTeam(res.data)
 
-      const settingsRes = await axios.get(`http://localhost:3000/api/settings/${userKey}`)
+      const settingsRes = await axios.get(`https://pokemon-overlay-backend-production.up.railway.app/api/settings/${userKey}`)
       setOrientation(settingsRes.data.orientation)
     } catch (err) {
       console.error(err)
@@ -167,7 +243,7 @@ function Panel() {
     const newOrientation = orientation === 'horizontal' ? 'vertical' : 'horizontal'
     setOrientation(newOrientation)
     try {
-      await axios.post(`http://localhost:3000/api/settings/${userKey}`, { orientation: newOrientation })
+      await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/settings/${userKey}`, { orientation: newOrientation })
     } catch (err) {
       console.error(err)
     }
@@ -177,7 +253,7 @@ function Panel() {
     if (userKey) {
       fetchTeam()
 
-      const socket = io('http://localhost:3000')
+      const socket = io('https://pokemon-overlay-backend-production.up.railway.app')
 
       socket.on('connect', () => {
         socket.emit('join_room', userKey)
@@ -202,7 +278,7 @@ function Panel() {
   const handleCreateKey = async () => {
     setIsCreatingKey(true)
     try {
-      const res = await axios.post('http://localhost:3000/api/keys')
+      const res = await axios.post('https://pokemon-overlay-backend-production.up.railway.app/api/keys')
       if (res.data.success) {
         setInputKey(res.data.apiKey)
         setUserKey(res.data.apiKey)
@@ -218,7 +294,7 @@ function Panel() {
   const openEditModal = (slot: number) => {
     setEditingSlot(slot)
     setSearchQuery('')
-    setSearchResults([])
+
     setSelectedPokemon(null)
     setNickname('')
     setIsDead(false)
@@ -241,11 +317,11 @@ function Panel() {
     if (!searchQuery) return
     try {
       const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${searchQuery.toLowerCase()}`)
-      setSearchResults([res.data])
+
       setSelectedPokemon(res.data)
     } catch (err) {
       console.error(err)
-      setSearchResults([])
+
       alert('Pokémon no encontrado')
     }
   }
@@ -256,7 +332,7 @@ function Panel() {
     if (!pokemon) return
 
     try {
-      await axios.post(`http://localhost:3000/api/pokemon/${userKey}`, {
+      await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`, {
         slot,
         name: pokemon.name,
         species: pokemon.species,
@@ -301,7 +377,7 @@ function Panel() {
     }
 
     try {
-      await axios.post(`http://localhost:3000/api/pokemon/${userKey}`, {
+      await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`, {
         slot: editingSlot,
         name: nickname || species,
         species,
@@ -319,46 +395,131 @@ function Panel() {
     if (!confirm('¿Estás seguro de que quieres liberar a este Pokémon?')) return
 
     try {
-      await axios.delete(`http://localhost:3000/api/pokemon/${userKey}/${editingSlot}`)
+      await axios.delete(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}/${editingSlot}`)
       setEditingSlot(null)
     } catch (err) {
       console.error(err)
     }
   }
 
+  // --- DND LOGIC ---
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    // Only simple feedback, logic is mainly in dragEnd for this specific "Swap/Move" requirement
+    console.log(event)
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    setActiveId(null)
 
-    if (active.id !== over?.id) {
-      const oldIndex = (active.id as number) - 1
-      const newIndex = (over?.id as number) - 1
+    if (!over) return
 
-      const slots = [1, 2, 3, 4, 5, 6]
-      const newSlots = arrayMove(slots, oldIndex, newIndex)
+    const activeIdStr = active.id as string
+    const overIdStr = over.id as string
 
-      const updates: { id: number, slot: number }[] = []
+    // 1. Team Reorder (Team -> Team)
+    if (activeIdStr.startsWith('team-') && overIdStr.startsWith('team-')) {
+      const activeSlot = parseInt(activeIdStr.split('-')[1])
+      const overSlot = parseInt(overIdStr.split('-')[1])
 
-      newSlots.forEach((originalSlotNum, index) => {
-        const newSlotNum = index + 1
-        const pokemon = team.find(p => p.slot === originalSlotNum)
-        if (pokemon) {
-          updates.push({ id: pokemon.id, slot: newSlotNum })
+      if (activeSlot !== overSlot) {
+        const slots = [1, 2, 3, 4, 5, 6]
+        const oldIndex = activeSlot - 1
+        const newIndex = overSlot - 1
+        const newSlots = arrayMove(slots, oldIndex, newIndex)
+
+        // Calculate updates
+        const updates: { id: number, slot: number }[] = []
+        newSlots.forEach((originalSlotNum, index) => {
+          const newSlotNum = index + 1
+          const pokemon = team.find(p => p.slot === originalSlotNum)
+          if (pokemon) {
+            updates.push({ id: pokemon.id, slot: newSlotNum })
+          }
+        })
+
+        // Optimistic update
+        const newTeam = team.map(p => {
+          const update = updates.find(u => u.id === p.id)
+          return update ? { ...p, slot: update.slot } : p
+        })
+        setTeam(newTeam)
+
+        try {
+          await axios.put(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}/reorder`, { items: updates })
+        } catch (err) {
+          console.error("Failed to reorder", err)
+          fetchTeam() // Revert
         }
-      })
-
-      // Optimistic update
-      const newTeam = team.map(p => {
-        const update = updates.find(u => u.id === p.id)
-        return update ? { ...p, slot: update.slot } : p
-      })
-      setTeam(newTeam)
-
-      try {
-        await axios.put(`http://localhost:3000/api/pokemon/${userKey}/reorder`, { items: updates })
-      } catch (err) {
-        console.error("Failed to reorder", err)
-        fetchTeam() // Revert on error
       }
+      return
+    }
+
+    // 2. Move from Team to Box
+    if (activeIdStr.startsWith('team-') && (overIdStr.startsWith('box-') || overIdStr === 'box-container')) {
+      const activeSlot = parseInt(activeIdStr.split('-')[1])
+      const pokemon = team.find(p => p.slot === activeSlot)
+
+      if (pokemon) {
+        if (!box.find(p => p.id === pokemon.id)) {
+          setBox(prev => [...prev, pokemon])
+        }
+
+        setTeam(prev => prev.filter(p => p.slot !== activeSlot))
+
+        // Update Team (Local) and Socket
+        try {
+          // Usamos DELETE para eliminar el Pokémon del equipo en la BD, igual que al liberar
+          await axios.delete(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}/${activeSlot}`)
+        } catch (err) {
+          console.error("Failed to move to box (delete)", err)
+          fetchTeam()
+        }
+      }
+      return
+    }
+
+    // 3. Move from Box to Team
+    if (activeIdStr.startsWith('box-') && overIdStr.startsWith('team-')) {
+      const pokemonId = parseInt(activeIdStr.split('-')[1])
+      const targetSlot = parseInt(overIdStr.split('-')[1])
+
+      const pokemonFromBox = box.find(p => p.id === pokemonId)
+      if (!pokemonFromBox) return
+
+      const existingInSlot = team.find(p => p.slot === targetSlot)
+
+      const newTeam = [...team.filter(p => p.slot !== targetSlot)]
+      const newBox = box.filter(p => p.id !== pokemonId)
+
+      // Add to team
+      newTeam.push({ ...pokemonFromBox, slot: targetSlot })
+
+      // If textng was in slot, move to box
+      if (existingInSlot) {
+        newBox.push(existingInSlot)
+      }
+
+      setTeam(newTeam)
+      setBox(newBox)
+      
+      try {
+        await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`, {
+          slot: targetSlot,
+          name: pokemonFromBox.name,
+          species: pokemonFromBox.species,
+          spriteUrl: pokemonFromBox.spriteUrl,
+          isDead: pokemonFromBox.isDead
+        })
+      } catch (err) {
+        console.error("Failed to sync move to team", err)
+      }
+      return
     }
   }
 
@@ -449,7 +610,7 @@ function Panel() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-100">
               <span className="font-medium text-gray-600 mb-1 sm:mb-0">API Key:</span>
               <div className="flex items-center gap-2 overflow-hidden max-w-full">
-                <code className={`font-mono text-sm bg-white px-2 py-1 rounded border border-gray-200 text-gray-700 transition-all duration-300 ${!showApiKey ? 'blur-[4px] select-none' : ''}`}>
+                <code className={`font-mono text-sm bg-white px-2 py-1 rounded border border-gray-200 text-gray-700 transition-all duration-300 ${!showApiKey ? 'blur-xs select-none' : ''}`}>
                   {userKey}
                 </code>
                 <button
@@ -457,7 +618,7 @@ function Panel() {
                     navigator.clipboard.writeText(userKey)
                     alert('API Key copiada al portapapeles')
                   }}
-                  className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-colors flex-shrink-0"
+                  className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-colors shrink-0"
                   title="Copiar API Key"
                 >
                   <Copy size={16} />
@@ -472,16 +633,16 @@ function Panel() {
                   href={`${window.location.origin}/overlay/${userKey}`}
                   target="_blank"
                   rel="noreferrer"
-                  className={`text-blue-600 hover:underline text-sm truncate transition-all duration-300 ${!showApiKey ? 'blur-[4px] select-none' : ''}`}
+                  className={`text-blue-600 hover:underline text-sm truncate transition-all duration-300 ${!showApiKey ? 'blur-xs select-none' : ''}`}
                 >
-                  {window.location.origin}/overlay/{userKey}
+                  {window.location.origin}/overlay/${userKey}
                 </a>
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/overlay/${userKey}`)
                     alert('URL copiada al portapapeles')
                   }}
-                  className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-colors flex-shrink-0"
+                  className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-colors shrink-0"
                   title="Copiar URL"
                 >
                   <Copy size={16} />
@@ -493,28 +654,94 @@ function Panel() {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={rectIntersection}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <SortableContext
-            items={[1, 2, 3, 4, 5, 6]}
-            strategy={rectSortingStrategy}
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-              {[1, 2, 3, 4, 5, 6].map((slot) => {
-                const pokemon = team.find((p) => p.slot === slot)
-                return (
-                  <SortableSlot
-                    key={slot}
-                    slot={slot}
-                    pokemon={pokemon}
-                    onEdit={() => openEditModal(slot)}
-                    onToggleDead={(status) => toggleDeadStatus(slot, status)}
-                  />
-                )
-              })}
+          <div className="space-y-8">
+            {/* EQUIPO POKEMON */}
+            <SortableContext
+              items={[1, 2, 3, 4, 5, 6].map(n => `team-${n}`)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+                {[1, 2, 3, 4, 5, 6].map((slot) => {
+                  const pokemon = team.find((p) => p.slot === slot)
+                  return (
+                    <SortableSlot
+                      key={`team-${slot}`}
+                      id={`team-${slot}`}
+                      slot={slot}
+                      pokemon={pokemon}
+                      onEdit={() => openEditModal(slot)}
+                      onToggleDead={(status) => toggleDeadStatus(slot, status)}
+                    />
+                  )
+                })}
+              </div>
+            </SortableContext>
+
+            {/* CAJA POKEMON */}
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center gap-2 mb-4 text-gray-700">
+                <BoxIcon size={24} />
+                <h2 className="text-xl font-bold">Caja Pokémon (Local)</h2>
+              </div>
+
+              <DropBox className="min-h-[150px] bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-200">
+                <SortableContext
+                  items={box.map(p => `box-${p.id}`)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="flex flex-wrap gap-4">
+                    {box.length === 0 && (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 py-10">
+                        Arrastra Pokémon aquí para guardarlos en la caja
+                      </div>
+                    )}
+                    {box.map((pokemon) => (
+                      <SortableBoxItem
+                        key={`box-${pokemon.id}`}
+                        id={`box-${pokemon.id}`}
+                        pokemon={pokemon}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DropBox>
             </div>
-          </SortableContext>
+          </div>
+
+          <DragOverlay>
+            {activeId && activeId.startsWith('team-') ? (
+              <div className="w-[300px] h-[300px] bg-white rounded-xl p-4 shadow-2xl opacity-90 scale-105 border-2 border-blue-500">
+                {/* Simplified drag preview for Team item */}
+                <div className="flex flex-col items-center justify-center h-full">
+                  {team.find(p => p.slot === parseInt(activeId.split('-')[1])) ? (
+                    <img
+                      src={team.find(p => p.slot === parseInt(activeId.split('-')[1]))?.spriteUrl}
+                      className="w-32 h-32 object-contain"
+                      alt="preview"
+                    />
+                  ) : (
+                    <span>Vacío</span>
+                  )}
+                </div>
+              </div>
+            ) : null}
+            {activeId && activeId.startsWith('box-') ? (
+              <div className="bg-white p-2 rounded-lg shadow-xl border border-blue-400 w-24 h-32 opacity-90 flex flex-col items-center justify-center">
+                {/* Simplified drag preview for Box item */}
+                <img
+                  src={box.find(p => `box-${p.id}` === activeId)?.spriteUrl}
+                  className="w-16 h-16 object-contain"
+                  alt="preview"
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+
         </DndContext>
 
         {editingSlot && (

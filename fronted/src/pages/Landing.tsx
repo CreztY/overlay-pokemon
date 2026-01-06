@@ -10,7 +10,7 @@ function Landing() {
     return (
         <div className="min-h-screen bg-white text-gray-800 font-sans selection:bg-blue-100 selection:text-blue-900">
             {/* Hero Section */}
-            <header className="bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-500 text-white pt-32 pb-40 px-6 text-center relative overflow-hidden">
+            <header className="bg-linear-to-r from-blue-500 via-indigo-600 to-purple-500 text-white pt-32 pb-40 px-6 text-center relative overflow-hidden">
                 <div className="absolute inset-0 opacity-20">
                     <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full mix-blend-overlay filter blur-3xl -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                     <div className="absolute bottom-0 right-0 w-96 h-96 bg-pink-500 rounded-full mix-blend-overlay filter blur-3xl translate-x-1/2 translate-y-1/2 animate-pulse" style={{ animationDelay: '2s' }} />
@@ -19,7 +19,7 @@ function Landing() {
                 <div className="max-w-5xl mx-auto relative z-10">
                     <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold mb-8 tracking-tight drop-shadow-xl leading-tight">
                         Tu Nuzlocke,<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-300">
+                        <span className="text-transparent bg-clip-text bg-linear-to-r from-yellow-300 to-pink-300">
                             Más Profesional
                         </span>
                     </h1>
@@ -46,7 +46,7 @@ function Landing() {
 
                 {/* Curve Divider */}
                 <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none rotate-180">
-                    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-[calc(100%+1.3px)] h-[60px] fill-white">
+                    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-[calc(100%+1.3px)] h-15 fill-white">
                         <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"></path>
                     </svg>
                 </div>
@@ -81,7 +81,7 @@ function Landing() {
                         </ul>
                     </div>
                     <div className="flex-1 relative group cursor-pointer" onClick={() => setSelectedImage(preview1)}>
-                        <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500" />
+                        <div className="absolute -inset-4 bg-linear-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500" />
                         <div className="relative bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 group-hover:scale-[1.02] transition-transform duration-500">
                             <img src={preview1} alt="Panel Dashboard" className="w-full h-auto" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -98,7 +98,7 @@ function Landing() {
             <section className="py-24 px-6 bg-gray-50 relative overflow-hidden">
                 <div className="max-w-7xl mx-auto flex flex-col-reverse lg:flex-row items-center gap-16">
                     <div className="flex-1 relative group cursor-pointer" onClick={() => setSelectedImage(preview2)}>
-                        <div className="absolute -inset-4 bg-gradient-to-r from-pink-100 to-orange-100 rounded-2xl transform -rotate-2 group-hover:-rotate-1 transition-transform duration-500" />
+                        <div className="absolute -inset-4 bg-linear-to-r from-pink-100 to-orange-100 rounded-2xl transform -rotate-2 group-hover:-rotate-1 transition-transform duration-500" />
                         <div className="relative bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-100 group-hover:scale-[1.02] transition-transform duration-500">
                             <img src={preview2} alt="OBS Overlay Preview" className="w-full h-auto" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -201,7 +201,7 @@ function Landing() {
                     </p>
                     <Link
                         to="/panel"
-                        className="inline-block px-12 py-5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full font-bold text-xl shadow-lg hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300"
+                        className="inline-block px-12 py-5 bg-linear-to-r from-blue-500 to-indigo-600 text-white rounded-full font-bold text-xl shadow-lg hover:shadow-blue-500/30 hover:scale-105 transition-all duration-300"
                     >
                         Crear mi Overlay Gratis
                     </Link>

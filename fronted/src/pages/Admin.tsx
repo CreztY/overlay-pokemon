@@ -46,7 +46,7 @@ function Admin() {
 
   const fetchKeys = useCallback(async () => {
     try {
-      const res = await axios.get('http://localhost:3000/api/admin/keys')
+      const res = await axios.get('https://pokemon-overlay-backend-production.up.railway.app/api/admin/keys')
       setUsers(res.data)
     } catch (err) {
       console.error(err)
@@ -72,6 +72,7 @@ function Admin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     try {
       const success = await loginAdmin(password)
       if (!success) {
@@ -90,7 +91,7 @@ function Admin() {
 
   const generateKey = async () => {
     try {
-      await axios.post('http://localhost:3000/api/admin/keys')
+      await axios.post('https://pokemon-overlay-backend-production.up.railway.app/api/admin/keys')
       fetchKeys()
     } catch (err) {
       console.error(err)
@@ -100,7 +101,7 @@ function Admin() {
   const deleteKey = async (key: string) => {
     if (!confirm('¿Seguro que quieres borrar esta key? Esta acción no se puede deshacer y el usuario perderá acceso a su equipo.')) return
     try {
-      await axios.delete(`http://localhost:3000/api/admin/keys/${key}`)
+      await axios.delete(`https://pokemon-overlay-backend-production.up.railway.app/api/admin/keys/${key}`)
       fetchKeys()
       if (selectedUser?.apiKey === key) {
         setSelectedUser(null)
@@ -119,7 +120,7 @@ function Admin() {
     setSelectedUser(user)
     setIsLoadingPokemon(true)
     try {
-      const res = await axios.get(`http://localhost:3000/api/pokemon/${user.apiKey}`)
+      const res = await axios.get(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${user.apiKey}`)
       setUserPokemon(res.data)
     } catch (err) {
       console.error(err)
