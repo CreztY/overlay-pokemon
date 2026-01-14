@@ -5,15 +5,14 @@ const db = require('./database');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
+const path = require("path")
+
+const FRONTEND_PATH = path.join(__dirname, "..", "frontend")
 
 const app = express();
 const httpServer = createServer(app);
 const allowedOrigins = [
-  'https://pokeoverlay.crezty.com', 
-  'localhost', 
-  'http://localhost',
-  'http://localhost:5173', // Vite default
-  'http://localhost:3000'
+  'https://pokeoverlay.crezty.com'
 ];
 
 const io = new Server(httpServer, {
@@ -73,6 +72,8 @@ io.on('connection', (socket) => {
     console.log('Cliente desconectado:', socket.id);
   });
 });
+
+app.use(express.static(FRONTEND_PATH))
 
 // --- Admin Routes ---
 
@@ -350,6 +351,11 @@ app.delete('/api/box/:apiKey/:id', (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// React Router fallback
+app.get(/.*/, (req, res) => {
+  res.sendFile(path.join(FRONTEND_PATH, "index.html"))
+})
 
 httpServer.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
