@@ -20,8 +20,8 @@ function Overlay() {
     const fetchData = async () => {
       try {
         const [teamRes, settingsRes] = await Promise.all([
-          axios.get(`http://localhost:3000/api/pokemon/${apiKey}`),
-          axios.get(`http://localhost:3000/api/settings/${apiKey}`)
+          axios.get(import.meta.env.VITE_API_URL + `/api/pokemon/${apiKey}`),
+          axios.get(import.meta.env.VITE_API_URL + `/api/settings/${apiKey}`)
         ])
         setTeam(teamRes.data)
         setOrientation(settingsRes.data.orientation)
@@ -33,7 +33,7 @@ function Overlay() {
     if (apiKey) {
       fetchData()
 
-      const socket = io('http://localhost:3000')
+      const socket = io(import.meta.env.VITE_API_URL)
 
       socket.on('connect', () => {
         console.log('Conectado al servidor de WebSockets')

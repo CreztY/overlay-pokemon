@@ -8,7 +8,13 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const httpServer = createServer(app);
-const allowedOrigins = ['https://pokeoverlay.crezty.com', 'https://pokemon-overlay-rust.vercel.app/'];
+const allowedOrigins = [
+  'https://pokeoverlay.crezty.com', 
+  'localhost', 
+  'http://localhost',
+  'http://localhost:5173', // Vite default
+  'http://localhost:3000'
+];
 
 const io = new Server(httpServer, {
   cors: {
@@ -47,6 +53,7 @@ app.post('/api/keys', createKeyLimiter, (req, res) => {
   try {
     const stmt = db.prepare('INSERT INTO users (apiKey) VALUES (?)');
     stmt.run(apiKey);
+    io.emit('keys_updated');
     res.json({ success: true, apiKey });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -84,6 +91,7 @@ app.post('/api/admin/keys', (req, res) => {
   try {
     const stmt = db.prepare('INSERT INTO users (apiKey) VALUES (?)');
     stmt.run(apiKey);
+    io.emit('keys_updated');
     res.json({ success: true, apiKey });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -113,6 +121,7 @@ app.delete('/api/admin/keys/:key', (req, res) => {
     const info = stmt.run(key);
 
     if (info.changes > 0) {
+      io.emit('keys_updated');
       return res.json({ success: true });
     } else {
       return res.status(404).json({ success: false, message: 'Key no encontrada' });
@@ -261,6 +270,79 @@ app.delete('/api/pokemon/:apiKey/:slot', (req, res) => {
 
     const stmt = db.prepare('DELETE FROM pokemon WHERE apiKey = ? AND slot = ?');
     stmt.run(apiKey, slot);
+
+    io.to(apiKey).emit('pokemon_updated');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// --- Pokemon Box Routes ---
+
+app.get('/api/box/:apiKey', (req, res) => {
+  const { apiKey } = req.params;
+  try {
+    const user = db.prepare('SELECT apiKey FROM users WHERE apiKey = ?').get(apiKey);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'API Key inválida' });
+    }
+
+    const boxPokemon = db.prepare('SELECT * FROM pokemon_box WHERE apiKey = ? ORDER BY id ASC').all(apiKey);
+    res.json(boxPokemon);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/box/:apiKey', (req, res) => {
+  const { apiKey } = req.params;
+  const { name, species, spriteUrl, isDead } = req.body;
+
+  try {
+    const user = db.prepare('SELECT apiKey FROM users WHERE apiKey = ?').get(apiKey);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'API Key inválida' });
+    }
+
+    const countRow = db.prepare('SELECT COUNT(*) as count FROM pokemon_box WHERE apiKey = ?').get(apiKey);
+    if (countRow.count >= 40) {
+      return res.status(400).json({ success: false, message: 'La caja está llena (máximo 40 Pokémon)' });
+    }
+
+    const stmt = db.prepare(`
+      INSERT INTO pokemon_box (apiKey, name, species, spriteUrl, isDead)
+      VALUES (@apiKey, @name, @species, @spriteUrl, @isDead)
+    `);
+
+    const info = stmt.run({
+      apiKey,
+      name,
+      species,
+      spriteUrl,
+      isDead: isDead ? 1 : 0
+    });
+
+    const created = db.prepare('SELECT * FROM pokemon_box WHERE id = ?').get(info.lastInsertRowid);
+
+    io.to(apiKey).emit('pokemon_updated');
+    res.json({ success: true, pokemon: created });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/box/:apiKey/:id', (req, res) => {
+  const { apiKey, id } = req.params;
+
+  try {
+    const user = db.prepare('SELECT apiKey FROM users WHERE apiKey = ?').get(apiKey);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'API Key inválida' });
+    }
+
+    const stmt = db.prepare('DELETE FROM pokemon_box WHERE apiKey = ? AND id = ?');
+    stmt.run(apiKey, id);
 
     io.to(apiKey).emit('pokemon_updated');
     res.json({ success: true });

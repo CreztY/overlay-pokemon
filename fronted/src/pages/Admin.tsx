@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import axios from 'axios'
+import { io } from 'socket.io-client'
 import {
   Search,
   Plus,
@@ -13,7 +15,8 @@ import {
   ShieldAlert,
   X,
   Skull,
-  Heart
+  Heart,
+  Box as BoxIcon
 } from 'lucide-react'
 
 interface User {
@@ -31,8 +34,17 @@ interface Pokemon {
   isDead: boolean
 }
 
+interface BoxPokemon {
+  id: number
+  name: string
+  species: string
+  spriteUrl: string
+  isDead: boolean
+}
+
 function Admin() {
   const { isAdmin, loginAdmin, logoutAdmin } = useAuth()
+  const { showToast } = useToast()
   const [password, setPassword] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
@@ -43,11 +55,14 @@ function Admin() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [userPokemon, setUserPokemon] = useState<Pokemon[]>([])
   const [isLoadingPokemon, setIsLoadingPokemon] = useState(false)
+  const [userBox, setUserBox] = useState<BoxPokemon[]>([])
 
   const fetchKeys = useCallback(async () => {
     try {
-      const res = await axios.get('https://pokemon-overlay-backend-production.up.railway.app/api/admin/keys')
-      setUsers(res.data)
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/admin/keys')
+      const data: User[] = res.data
+      setUsers(data)
+      return data
     } catch (err) {
       console.error(err)
     }
@@ -55,9 +70,51 @@ function Admin() {
 
   useEffect(() => {
     if (isAdmin) {
-      fetchKeys()
+      const socket = io(import.meta.env.VITE_API_URL)
+
+      const loadAndJoinRooms = async () => {
+        const data = await fetchKeys()
+        if (data) {
+          data.forEach((user) => {
+            socket.emit('join_room', user.apiKey)
+          })
+        }
+      }
+
+      loadAndJoinRooms()
+
+      socket.on('keys_updated', () => {
+        loadAndJoinRooms()
+      })
+
+      socket.on('pokemon_updated', () => {
+        fetchKeys()
+        if (selectedUser) {
+          setIsLoadingPokemon(true)
+          Promise.all([
+            axios.get(`${import.meta.env.VITE_API_URL}/api/pokemon/${selectedUser.apiKey}`),
+            axios.get(`${import.meta.env.VITE_API_URL}/api/box/${selectedUser.apiKey}`)
+          ])
+            .then(([teamRes, boxRes]) => {
+              setUserPokemon(teamRes.data)
+              setUserBox(boxRes.data)
+            })
+            .catch((err) => {
+              console.error(err)
+              setUserPokemon([])
+              setUserBox([])
+            })
+            .finally(() => {
+              setIsLoadingPokemon(false)
+            })
+        }
+      })
+
+      return () => {
+        socket.disconnect()
+      }
     }
-  }, [isAdmin, fetchKeys])
+  }, [isAdmin, fetchKeys, selectedUser])
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -80,8 +137,8 @@ function Admin() {
       } else {
         setError('')
       }
-    } catch (err: any) {
-      if (err.response && err.response.status === 429) {
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
         setError('Demasiados intentos. Por favor, espera 15 minutos.')
       } else {
         setError('Contraseña incorrecta')
@@ -91,8 +148,9 @@ function Admin() {
 
   const generateKey = async () => {
     try {
-      await axios.post('https://pokemon-overlay-backend-production.up.railway.app/api/admin/keys')
+      await axios.post(import.meta.env.VITE_API_URL + '/api/admin/keys')
       fetchKeys()
+      showToast('Nueva API Key generada', 'success')
     } catch (err) {
       console.error(err)
     }
@@ -101,11 +159,12 @@ function Admin() {
   const deleteKey = async (key: string) => {
     if (!confirm('¿Seguro que quieres borrar esta key? Esta acción no se puede deshacer y el usuario perderá acceso a su equipo.')) return
     try {
-      await axios.delete(`https://pokemon-overlay-backend-production.up.railway.app/api/admin/keys/${key}`)
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/keys/${key}`)
       fetchKeys()
       if (selectedUser?.apiKey === key) {
         setSelectedUser(null)
       }
+      showToast('Key eliminada correctamente', 'success')
     } catch (err) {
       console.error(err)
     }
@@ -120,11 +179,16 @@ function Admin() {
     setSelectedUser(user)
     setIsLoadingPokemon(true)
     try {
-      const res = await axios.get(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${user.apiKey}`)
-      setUserPokemon(res.data)
+      const [teamRes, boxRes] = await Promise.all([
+        axios.get(`${import.meta.env.VITE_API_URL}/api/pokemon/${user.apiKey}`),
+        axios.get(`${import.meta.env.VITE_API_URL}/api/box/${user.apiKey}`)
+      ])
+      setUserPokemon(teamRes.data)
+      setUserBox(boxRes.data)
     } catch (err) {
       console.error(err)
       setUserPokemon([])
+      setUserBox([])
     } finally {
       setIsLoadingPokemon(false)
     }
@@ -330,8 +394,14 @@ function Admin() {
 
       {/* User Details Modal */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-zoom-in">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setSelectedUser(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-zoom-in"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
               <div>
@@ -354,6 +424,9 @@ function Admin() {
                 </div>
                 <div className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full border border-purple-100">
                   Pokémon: {userPokemon.length} / 6
+                </div>
+                <div className="bg-green-50 text-green-700 px-3 py-1 rounded-full border border-green-100">
+                  Caja: {userBox.length}
                 </div>
               </div>
 
@@ -399,6 +472,50 @@ function Admin() {
                   ))}
                 </div>
               )}
+
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <BoxIcon size={20} className="text-gray-400" />
+                  Caja Pokémon
+                </h3>
+
+                {isLoadingPokemon ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : userBox.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <p className="text-gray-500">Este usuario no tiene Pokémon en la caja.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {userBox.map((pokemon) => (
+                      <div
+                        key={pokemon.id}
+                        className={`relative p-3 rounded-lg border ${pokemon.isDead ? 'bg-gray-100 border-gray-200' : 'bg-white border-blue-100 shadow-sm'}`}
+                      >
+                        <div className="absolute top-2 right-2">
+                          {pokemon.isDead ? (
+                            <Skull size={16} className="text-gray-400" />
+                          ) : (
+                            <Heart size={16} className="text-red-400 fill-red-400" />
+                          )}
+                        </div>
+                        <div className="aspect-square flex items-center justify-center mb-2">
+                          <img
+                            src={pokemon.spriteUrl}
+                            alt={pokemon.name}
+                            className={`w-full h-full object-contain ${pokemon.isDead ? 'grayscale opacity-50' : ''}`}
+                          />
+                        </div>
+                        <p className="text-center font-bold text-sm capitalize truncate" title={pokemon.name}>
+                          {pokemon.name}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Modal Footer */}

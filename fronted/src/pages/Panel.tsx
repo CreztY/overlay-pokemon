@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import {
@@ -44,11 +45,11 @@ import {
 
 interface Pokemon {
   id: number
-  slot: number
   name: string
   species: string
   spriteUrl: string
   isDead: boolean
+  slot?: number
 }
 
 interface PokeApiPokemon {
@@ -90,7 +91,7 @@ function SortableSlot({ id, slot, pokemon, onEdit, onToggleDead }: { id: string,
           <span>Slot {slot}</span>
           {pokemon && (
             <button
-              onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleDead(!!pokemon.isDead);
@@ -192,6 +193,7 @@ function DropBox({ children, className }: { children: React.ReactNode, className
 
 function Panel() {
   const { userKey, setUserKey } = useAuth()
+  const { showToast } = useToast()
   const [inputKey, setInputKey] = useState('')
   const [showLoginKey, setShowLoginKey] = useState(false)
   const [isCreatingKey, setIsCreatingKey] = useState(false)
@@ -224,15 +226,23 @@ function Panel() {
   const fetchTeam = async () => {
     if (!userKey) return
     try {
-      const res = await axios.get(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`)
-      setTeam(res.data)
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}`)
+      const teamData: Pokemon[] = res.data
+      setTeam(teamData)
 
-      const settingsRes = await axios.get(`https://pokemon-overlay-backend-production.up.railway.app/api/settings/${userKey}`)
-      setOrientation(settingsRes.data.orientation)
+      const boxRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/box/${userKey}`)
+      const boxData: Pokemon[] = boxRes.data
+      setBox(boxData)
+
+      const settingsRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/settings/${userKey}`)
+      const orientationValue = settingsRes.data.orientation as 'horizontal' | 'vertical'
+      setOrientation(orientationValue)
+
+      return { team: teamData, box: boxData, orientation: orientationValue }
     } catch (err) {
       console.error(err)
       if (axios.isAxiosError(err) && err.response?.status === 404) {
-        alert('API Key inválida')
+        showToast('API Key inválida para este servidor. Crea una nueva desde este panel.', 'error')
         setUserKey(null)
       }
     }
@@ -243,7 +253,7 @@ function Panel() {
     const newOrientation = orientation === 'horizontal' ? 'vertical' : 'horizontal'
     setOrientation(newOrientation)
     try {
-      await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/settings/${userKey}`, { orientation: newOrientation })
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/settings/${userKey}`, { orientation: newOrientation })
     } catch (err) {
       console.error(err)
     }
@@ -253,7 +263,7 @@ function Panel() {
     if (userKey) {
       fetchTeam()
 
-      const socket = io('https://pokemon-overlay-backend-production.up.railway.app')
+      const socket = io(import.meta.env.VITE_API_URL)
 
       socket.on('connect', () => {
         socket.emit('join_room', userKey)
@@ -278,20 +288,20 @@ function Panel() {
   const handleCreateKey = async () => {
     setIsCreatingKey(true)
     try {
-      const res = await axios.post('https://pokemon-overlay-backend-production.up.railway.app/api/keys')
+      const res = await axios.post(import.meta.env.VITE_API_URL + '/api/keys')
       if (res.data.success) {
         setInputKey(res.data.apiKey)
         setUserKey(res.data.apiKey)
       }
     } catch (err) {
       console.error(err)
-      alert('Error al crear la API Key')
+      showToast('Error al crear la API Key', 'error')
     } finally {
       setIsCreatingKey(false)
     }
   }
 
-  const openEditModal = (slot: number) => {
+  const openEditModal = async (slot: number) => {
     setEditingSlot(slot)
     setSearchQuery('')
 
@@ -300,8 +310,10 @@ function Panel() {
     setIsDead(false)
     setCustomSpriteUrl('')
 
-    // Pre-fill if slot exists
-    const existing = team.find(p => p.slot === slot)
+    const data = await fetchTeam()
+    const currentTeam = data?.team ?? team
+
+    const existing = currentTeam.find(p => p.slot === slot)
     if (existing) {
       setNickname(existing.name)
       setIsDead(!!existing.isDead)
@@ -321,8 +333,7 @@ function Panel() {
       setSelectedPokemon(res.data)
     } catch (err) {
       console.error(err)
-
-      alert('Pokémon no encontrado')
+      showToast('Pokémon no encontrado', 'error')
     }
   }
 
@@ -332,7 +343,7 @@ function Panel() {
     if (!pokemon) return
 
     try {
-      await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`, {
+      await axios.post(import.meta.env.VITE_API_URL + `/api/pokemon/${userKey}`, {
         slot,
         name: pokemon.name,
         species: pokemon.species,
@@ -366,7 +377,7 @@ function Panel() {
     }
 
     if (!species && !spriteUrl && !existing) {
-      alert('Selecciona un Pokémon o introduce una URL')
+      showToast('Selecciona un Pokémon o introduce una URL', 'error')
       return
     }
 
@@ -377,7 +388,7 @@ function Panel() {
     }
 
     try {
-      await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`, {
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}`, {
         slot: editingSlot,
         name: nickname || species,
         species,
@@ -395,7 +406,7 @@ function Panel() {
     if (!confirm('¿Estás seguro de que quieres liberar a este Pokémon?')) return
 
     try {
-      await axios.delete(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}/${editingSlot}`)
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}/${editingSlot}`)
       setEditingSlot(null)
     } catch (err) {
       console.error(err)
@@ -451,7 +462,7 @@ function Panel() {
         setTeam(newTeam)
 
         try {
-          await axios.put(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}/reorder`, { items: updates })
+          await axios.put(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}/reorder`, { items: updates })
         } catch (err) {
           console.error("Failed to reorder", err)
           fetchTeam() // Revert
@@ -460,24 +471,32 @@ function Panel() {
       return
     }
 
-    // 2. Move from Team to Box
     if (activeIdStr.startsWith('team-') && (overIdStr.startsWith('box-') || overIdStr === 'box-container')) {
       const activeSlot = parseInt(activeIdStr.split('-')[1])
       const pokemon = team.find(p => p.slot === activeSlot)
 
       if (pokemon) {
+        if (box.length >= 40 && !box.find(p => p.id === pokemon.id)) {
+          showToast('La caja está llena (máximo 40 Pokémon)', 'error')
+          return
+        }
         if (!box.find(p => p.id === pokemon.id)) {
           setBox(prev => [...prev, pokemon])
         }
 
         setTeam(prev => prev.filter(p => p.slot !== activeSlot))
 
-        // Update Team (Local) and Socket
         try {
-          // Usamos DELETE para eliminar el Pokémon del equipo en la BD, igual que al liberar
-          await axios.delete(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}/${activeSlot}`)
+          await axios.post(`${import.meta.env.VITE_API_URL}/api/box/${userKey}`, {
+            name: pokemon.name,
+            species: pokemon.species,
+            spriteUrl: pokemon.spriteUrl,
+            isDead: pokemon.isDead
+          })
+
+          await axios.delete(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}/${activeSlot}`)
         } catch (err) {
-          console.error("Failed to move to box (delete)", err)
+          console.error("Failed to move to box", err)
           fetchTeam()
         }
       }
@@ -509,15 +528,18 @@ function Panel() {
       setBox(newBox)
       
       try {
-        await axios.post(`https://pokemon-overlay-backend-production.up.railway.app/api/pokemon/${userKey}`, {
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}`, {
           slot: targetSlot,
           name: pokemonFromBox.name,
           species: pokemonFromBox.species,
           spriteUrl: pokemonFromBox.spriteUrl,
           isDead: pokemonFromBox.isDead
         })
+
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/box/${userKey}/${pokemonFromBox.id}`)
       } catch (err) {
         console.error("Failed to sync move to team", err)
+        fetchTeam()
       }
       return
     }
@@ -616,7 +638,7 @@ function Panel() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(userKey)
-                    alert('API Key copiada al portapapeles')
+                    showToast('API Key copiada al portapapeles', 'success')
                   }}
                   className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-colors shrink-0"
                   title="Copiar API Key"
@@ -640,7 +662,7 @@ function Panel() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/overlay/${userKey}`)
-                    alert('URL copiada al portapapeles')
+                    showToast('URL copiada al portapapeles', 'success')
                   }}
                   className="p-1.5 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500 transition-colors shrink-0"
                   title="Copiar URL"
@@ -686,7 +708,7 @@ function Panel() {
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center gap-2 mb-4 text-gray-700">
                 <BoxIcon size={24} />
-                <h2 className="text-xl font-bold">Caja Pokémon (Local)</h2>
+                <h2 className="text-xl font-bold">Caja Pokémon</h2>
               </div>
 
               <DropBox className="min-h-[150px] bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-200">
@@ -745,8 +767,14 @@ function Panel() {
         </DndContext>
 
         {editingSlot && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setEditingSlot(null)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                 <h2 className="text-xl font-bold text-gray-800">Editar Slot {editingSlot}</h2>
                 <button

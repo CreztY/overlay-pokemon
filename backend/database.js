@@ -24,7 +24,20 @@ const createPokemonTable = `
   );
 `;
 
+const createPokemonBoxTable = `
+  CREATE TABLE IF NOT EXISTS pokemon_box (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    apiKey TEXT,
+    name TEXT,
+    species TEXT,
+    spriteUrl TEXT,
+    isDead INTEGER DEFAULT 0,
+    FOREIGN KEY(apiKey) REFERENCES users(apiKey) ON DELETE CASCADE
+  );
+`;
+
 db.exec(createUsersTable);
 db.exec(createPokemonTable);
+db.exec(createPokemonBoxTable);
 
 module.exports = db;
