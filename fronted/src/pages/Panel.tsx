@@ -226,15 +226,15 @@ function Panel() {
   const fetchTeam = async () => {
     if (!userKey) return
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}`)
+      const res = await axios.get(`/api/pokemon/${userKey}`)
       const teamData: Pokemon[] = res.data
       setTeam(teamData)
 
-      const boxRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/box/${userKey}`)
+      const boxRes = await axios.get(`/api/box/${userKey}`)
       const boxData: Pokemon[] = boxRes.data
       setBox(boxData)
 
-      const settingsRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/settings/${userKey}`)
+      const settingsRes = await axios.get(`/api/settings/${userKey}`)
       const orientationValue = settingsRes.data.orientation as 'horizontal' | 'vertical'
       setOrientation(orientationValue)
 
@@ -253,7 +253,7 @@ function Panel() {
     const newOrientation = orientation === 'horizontal' ? 'vertical' : 'horizontal'
     setOrientation(newOrientation)
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/settings/${userKey}`, { orientation: newOrientation })
+      await axios.post(`/api/settings/${userKey}`, { orientation: newOrientation })
     } catch (err) {
       console.error(err)
     }
@@ -263,7 +263,7 @@ function Panel() {
     if (userKey) {
       fetchTeam()
 
-      const socket = io(import.meta.env.VITE_API_URL)
+      const socket = io('/')
 
       socket.on('connect', () => {
         socket.emit('join_room', userKey)
@@ -288,7 +288,7 @@ function Panel() {
   const handleCreateKey = async () => {
     setIsCreatingKey(true)
     try {
-      const res = await axios.post(import.meta.env.VITE_API_URL + '/api/keys')
+      const res = await axios.post('/api/keys')
       if (res.data.success) {
         setInputKey(res.data.apiKey)
         setUserKey(res.data.apiKey)
@@ -343,7 +343,7 @@ function Panel() {
     if (!pokemon) return
 
     try {
-      await axios.post(import.meta.env.VITE_API_URL + `/api/pokemon/${userKey}`, {
+      await axios.post(`/api/pokemon/${userKey}`, {
         slot,
         name: pokemon.name,
         species: pokemon.species,
@@ -388,7 +388,7 @@ function Panel() {
     }
 
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}`, {
+      await axios.post(`/api/pokemon/${userKey}`, {
         slot: editingSlot,
         name: nickname || species,
         species,
@@ -406,7 +406,7 @@ function Panel() {
     if (!confirm('¿Estás seguro de que quieres liberar a este Pokémon?')) return
 
     try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}/${editingSlot}`)
+      await axios.delete(`/api/pokemon/${userKey}/${editingSlot}`)
       setEditingSlot(null)
     } catch (err) {
       console.error(err)
@@ -462,7 +462,7 @@ function Panel() {
         setTeam(newTeam)
 
         try {
-          await axios.put(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}/reorder`, { items: updates })
+          await axios.put(`/api/pokemon/${userKey}/reorder`, { items: updates })
         } catch (err) {
           console.error("Failed to reorder", err)
           fetchTeam() // Revert
@@ -487,14 +487,14 @@ function Panel() {
         setTeam(prev => prev.filter(p => p.slot !== activeSlot))
 
         try {
-          await axios.post(`${import.meta.env.VITE_API_URL}/api/box/${userKey}`, {
+          await axios.post(`/api/box/${userKey}`, {
             name: pokemon.name,
             species: pokemon.species,
             spriteUrl: pokemon.spriteUrl,
             isDead: pokemon.isDead
           })
 
-          await axios.delete(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}/${activeSlot}`)
+          await axios.delete(`/api/pokemon/${userKey}/${activeSlot}`)
         } catch (err) {
           console.error("Failed to move to box", err)
           fetchTeam()
@@ -526,9 +526,9 @@ function Panel() {
 
       setTeam(newTeam)
       setBox(newBox)
-      
+
       try {
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/pokemon/${userKey}`, {
+        await axios.post(`/api/pokemon/${userKey}`, {
           slot: targetSlot,
           name: pokemonFromBox.name,
           species: pokemonFromBox.species,
@@ -536,7 +536,7 @@ function Panel() {
           isDead: pokemonFromBox.isDead
         })
 
-        await axios.delete(`${import.meta.env.VITE_API_URL}/api/box/${userKey}/${pokemonFromBox.id}`)
+        await axios.delete(`/api/box/${userKey}/${pokemonFromBox.id}`)
       } catch (err) {
         console.error("Failed to sync move to team", err)
         fetchTeam()

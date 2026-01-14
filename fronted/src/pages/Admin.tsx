@@ -59,7 +59,7 @@ function Admin() {
 
   const fetchKeys = useCallback(async () => {
     try {
-      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/admin/keys')
+      const res = await axios.get('/api/admin/keys')
       const data: User[] = res.data
       setUsers(data)
       return data
@@ -70,7 +70,7 @@ function Admin() {
 
   useEffect(() => {
     if (isAdmin) {
-      const socket = io(import.meta.env.VITE_API_URL)
+      const socket = io('/')
 
       const loadAndJoinRooms = async () => {
         const data = await fetchKeys()
@@ -92,8 +92,8 @@ function Admin() {
         if (selectedUser) {
           setIsLoadingPokemon(true)
           Promise.all([
-            axios.get(`${import.meta.env.VITE_API_URL}/api/pokemon/${selectedUser.apiKey}`),
-            axios.get(`${import.meta.env.VITE_API_URL}/api/box/${selectedUser.apiKey}`)
+            axios.get(`/api/pokemon/${selectedUser.apiKey}`),
+            axios.get(`/api/box/${selectedUser.apiKey}`)
           ])
             .then(([teamRes, boxRes]) => {
               setUserPokemon(teamRes.data)
@@ -148,7 +148,7 @@ function Admin() {
 
   const generateKey = async () => {
     try {
-      await axios.post(import.meta.env.VITE_API_URL + '/api/admin/keys')
+      await axios.post('/api/admin/keys')
       fetchKeys()
       showToast('Nueva API Key generada', 'success')
     } catch (err) {
@@ -159,7 +159,7 @@ function Admin() {
   const deleteKey = async (key: string) => {
     if (!confirm('¿Seguro que quieres borrar esta key? Esta acción no se puede deshacer y el usuario perderá acceso a su equipo.')) return
     try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/admin/keys/${key}`)
+      await axios.delete(`/api/admin/keys/${key}`)
       fetchKeys()
       if (selectedUser?.apiKey === key) {
         setSelectedUser(null)
@@ -180,8 +180,8 @@ function Admin() {
     setIsLoadingPokemon(true)
     try {
       const [teamRes, boxRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_API_URL}/api/pokemon/${user.apiKey}`),
-        axios.get(`${import.meta.env.VITE_API_URL}/api/box/${user.apiKey}`)
+        axios.get(`/api/pokemon/${user.apiKey}`),
+        axios.get(`/api/box/${user.apiKey}`)
       ])
       setUserPokemon(teamRes.data)
       setUserBox(boxRes.data)

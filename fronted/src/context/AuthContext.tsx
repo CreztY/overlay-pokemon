@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginAdmin = async (password: string) => {
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/admin/login`, { password })
+      const response = await axios.post(`/api/admin/login`, { password })
       if (response.data.success) {
         setIsAdmin(true)
         return true
