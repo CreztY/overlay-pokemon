@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import axios from 'axios'
 import { io } from 'socket.io-client'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   DndContext,
   KeyboardSensor,
@@ -42,6 +43,7 @@ import {
   Key,
   Box as BoxIcon
 } from 'lucide-react'
+import SEO from '../components/SEO'
 
 interface Pokemon {
   id: number
@@ -82,52 +84,89 @@ function SortableSlot({ id, slot, pokemon, onEdit, onToggleDead }: { id: string,
       style={style}
       {...attributes}
       {...listeners}
-      className='relative'>
-      <div className={`absolute -inset-4 bg-linear-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500'}`} />
+      className='relative h-full'> {/* Ensure height context */}
+      <div className={`absolute -inset-2 bg-linear-to-r from-blue-100 to-purple-100 rounded-2xl transform rotate-2 group-hover:rotate-1 transition-transform duration-500 opacity-0 group-hover:opacity-100`} />
+
       <div
-        className={`bg-white border border-gray-200 rounded-xl p-6 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-shadow min-h-[250px] relative cursor-grab ${pokemon?.isDead ? 'bg-gray-100' : ''} ${isDragging ? 'opacity-30 ring-2 ring-blue-500' : ''}`}
+        className={`bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center justify-between shadow-sm hover:shadow-md transition-all min-h-[260px] relative cursor-pointer group ${pokemon?.isDead ? 'bg-gray-50' : ''} ${isDragging ? 'opacity-30 ring-2 ring-blue-500' : ''}`}
       >
-        <div className="text-gray-400 font-semibold mb-2 w-full flex justify-between items-center">
+        <div className="text-gray-400 font-semibold mb-2 w-full flex justify-between items-center text-xs uppercase tracking-wider">
           <span>Slot {slot}</span>
-          {pokemon && (
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleDead(!!pokemon.isDead);
-              }}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded font-bold cursor-pointer transition-colors ${pokemon.isDead ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'}`}
-              title={pokemon.isDead ? "Revivir" : "Debilitar"}
-            >
-              {pokemon.isDead ? <Heart size={14} /> : <Skull size={14} />}
-              {pokemon.isDead ? "REVIVIR" : "DEBILITAR"}
-            </button>
-          )}
-        </div>
-        {pokemon ? (
-          <div className="flex flex-col items-center pointer-events-none">
-            <img
-              src={pokemon.spriteUrl}
-              alt={pokemon.name}
-              className={`w-32 h-32 object-contain mb-4 drop-shadow-md ${pokemon.isDead ? 'grayscale opacity-60' : ''}`}
-            />
-            <p className={'text-xl font-bold capitalize text-gray-800'}>{pokemon.name}</p>
-            {pokemon.name.toLowerCase() !== pokemon.species.toLowerCase() && (
-              <p className="text-sm text-gray-500 capitalize">({pokemon.species})</p>
+          <AnimatePresence>
+            {pokemon && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleDead(!!pokemon.isDead);
+                }}
+                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-bold cursor-pointer transition-colors shadow-sm ${pokemon.isDead ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'}`}
+                title={pokemon.isDead ? "Revivir" : "Debilitar"}
+              >
+                {pokemon.isDead ? <Heart size={12} /> : <Skull size={12} />}
+                {pokemon.isDead ? "REVIVIR" : "DEBILITAR"}
+              </motion.button>
             )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center grow text-gray-400 pointer-events-none">
-            <Plus size={48} className="mb-2 opacity-20" />
-            <p>Vacío</p>
-          </div>
-        )}
+          </AnimatePresence>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center w-full">
+          <AnimatePresence mode='wait'>
+            {pokemon ? (
+              <motion.div
+                key={pokemon.id}
+                layoutId={`panel-pokemon-${pokemon.id}`}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                className="flex flex-col items-center pointer-events-none w-full"
+              >
+                <div className="relative">
+                  <motion.img
+                    src={pokemon.spriteUrl}
+                    alt={pokemon.name}
+                    className={`w-28 h-28 object-contain mb-2 drop-shadow-md transition-all duration-300 ${pokemon.isDead ? 'grayscale opacity-70' : ''}`}
+                    animate={{ filter: pokemon.isDead ? 'grayscale(100%)' : 'grayscale(0%)' }}
+                  />
+                  {pokemon.isDead && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="absolute -top-2 -right-2 bg-gray-800 text-white p-1 rounded-full"
+                    >
+                      <Skull size={16} />
+                    </motion.div>
+                  )}
+                </div>
+                <p className={`text-lg font-bold capitalize ${pokemon.isDead ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{pokemon.name}</p>
+                {pokemon.name.toLowerCase() !== pokemon.species.toLowerCase() && (
+                  <p className="text-xs text-gray-500 capitalize">({pokemon.species})</p>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center text-gray-300 pointer-events-none"
+              >
+                <Plus size={40} className="mb-2 opacity-20" />
+                <p className="text-sm font-medium">Vacío</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
         <button
           onPointerDown={(e) => e.stopPropagation()} // Prevent drag start
           onClick={onEdit}
-          className="mt-6 w-full py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors font-medium cursor-pointer flex items-center justify-center gap-2"
+          className="mt-4 w-full py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium cursor-pointer flex items-center justify-center gap-2 text-sm"
         >
-          {pokemon ? <><Edit2 size={16} /> Editar</> : <><Plus size={16} /> Añadir Pokémon</>}
+          {pokemon ? <><Edit2 size={14} /> Editar</> : <><Plus size={14} /> Añadir</>}
         </button>
       </div>
     </div>
@@ -157,15 +196,20 @@ function SortableBoxItem({ id, pokemon }: { id: string, pokemon: Pokemon }) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow cursor-grab flex flex-col items-center w-24 h-32 justify-center ${isDragging ? 'opacity-50 ring-2 ring-indigo-400' : ''}`}
+      className={`relative bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow cursor-grab flex flex-col items-center w-24 h-32 justify-center group transition-all ${isDragging ? 'opacity-50 ring-2 ring-indigo-400' : ''}`}
     >
-      <img
-        src={pokemon.spriteUrl}
-        alt={pokemon.name}
-        className="w-16 h-16 object-contain mb-1 pointer-events-none"
-      />
-      <p className="text-xs font-bold text-gray-700 text-center truncate w-full pointer-events-none">{pokemon.name}</p>
-      {pokemon.isDead ? <Skull size={12} className="text-gray-400 absolute top-1 right-1" /> : null}
+      <motion.div
+        layoutId={`panel-box-${pokemon.id}`}
+        className="flex flex-col items-center w-full"
+      >
+        <img
+          src={pokemon.spriteUrl}
+          alt={pokemon.name}
+          className={`w-16 h-16 object-contain mb-1 pointer-events-none transition-filters ${pokemon.isDead ? 'grayscale opacity-70' : ''}`}
+        />
+        <p className="text-xs font-bold text-gray-700 text-center truncate w-full pointer-events-none px-1">{pokemon.name}</p>
+        {pokemon.isDead && <Skull size={14} className="text-red-400 absolute top-1 right-1" />}
+      </motion.div>
     </div>
   )
 }
@@ -177,15 +221,22 @@ function DropBox({ children, className }: { children: React.ReactNode, className
   })
 
   return (
-    <div ref={setNodeRef} className={`relative transition-all duration-300 ${isOver ? 'bg-blue-100 border-blue-400 scale-[1.01] shadow-md ring-4 ring-blue-200' : ''} ${className}`}>
+    <div ref={setNodeRef} className={`relative transition-all duration-300 ${isOver ? 'bg-blue-50 border-blue-400 shadow-inner' : ''} ${className}`}>
       {children}
-      {isOver && (
-        <div className="absolute inset-0 flex items-center justify-center bg-blue-50/50 backdrop-blur-[1px] rounded-lg z-10 pointer-events-none">
-          <div className="bg-white p-4 rounded-full shadow-lg text-blue-500 animate-bounce">
-            <BoxIcon size={40} />
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isOver && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex items-center justify-center bg-blue-50/80 backdrop-blur-[1px] rounded-lg z-10 pointer-events-none"
+          >
+            <div className="bg-white p-4 rounded-full shadow-lg text-blue-500 animate-bounce">
+              <BoxIcon size={40} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -197,6 +248,8 @@ function Panel() {
   const [inputKey, setInputKey] = useState('')
   const [showLoginKey, setShowLoginKey] = useState(false)
   const [isCreatingKey, setIsCreatingKey] = useState(false)
+
+
 
   const [team, setTeam] = useState<Pokemon[]>([])
   const [box, setBox] = useState<Pokemon[]>([])
@@ -548,6 +601,7 @@ function Panel() {
   if (!userKey) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <SEO title="Panel de Control - Pokémon Overlay" description="Gestiona tu equipo y overlay desde aquí." noindex={true} />
         <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">Acceso al Panel</h1>
           <form onSubmit={handleKeySubmit} className="space-y-4">
@@ -592,6 +646,7 @@ function Panel() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
+      <SEO title="Panel de Control - Pokémon Overlay" description="Gestiona tu equipo y overlay desde aquí." noindex={true} />
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-3xl font-bold text-gray-900">Tu Equipo Pokémon</h1>

@@ -4,11 +4,17 @@ import preview1 from '../assets/preview1.png'
 import preview2 from '../assets/preview2.png'
 import { X, ZoomIn } from 'lucide-react'
 
+import SEO from '../components/SEO'
+
 function Landing() {
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
     return (
         <div className="min-h-screen bg-white text-gray-800 font-sans selection:bg-blue-100 selection:text-blue-900">
+            <SEO
+                title="Pokémon Overlay - Tu Nuzlocke, Más Profesional"
+                description="Gestiona tu equipo Pokémon en tiempo real, sincroniza con OBS y sorprende a tu audiencia con un overlay dinámico y moderno para Nuzlockes."
+            />
             {/* Hero Section */}
             <header className="bg-linear-to-r from-blue-500 via-indigo-600 to-purple-500 text-white pt-32 pb-40 px-6 text-center relative overflow-hidden">
                 <div className="absolute inset-0 opacity-20">
